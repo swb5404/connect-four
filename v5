@@ -1,0 +1,307 @@
+/*
+  WiFiAccessPoint.ino creates a WiFi access point and provides a web server on it.
+
+  Steps:
+  1. Connect to the access point "yourAp"
+  2. Point your web browser to http://192.168.4.1/H to turn the LED on or http://192.168.4.1/L to turn it off
+     OR
+     Run raw TCP "GET /H" and "GET /L" on PuTTY terminal with 192.168.4.1 as IP address and 80 as port
+
+  Created for arduino-esp32 on 04 July, 2018
+  by Elochukwu Ifediora (fedy0)
+*/
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
+
+#define LED_BUILTIN 2   // Set the GPIO pin where you connected your test LED or comment this line out if your dev board has a built-in LED
+
+// Set these to your desired credentials.
+const char *ssid = "connect4 (pwd: connect4)";
+const char *password = "connect4";
+
+WiFiServer server(80);
+
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("Configuring access point...");
+
+  // You can remove the password parameter if you want the AP to be open.
+  WiFi.softAP(ssid, password);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.begin();
+
+  Serial.println("Server started");
+}
+
+void loop() {
+  WiFiClient client = server.available();   // listen for incoming clients
+
+  if (client) {                             // if you get a client,
+    Serial.println("New Client.");           // print a message out the serial port
+    String currentLine = "";                // make a String to hold incoming data from the client
+    while (client.connected()) {            // loop while the client's connected
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out the serial monitor
+        if (c == '\n') {                    // if the byte is a newline character
+
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+
+            // the content of the HTTP response follows the header:
+            //client.print("Click <a href=\"/H\">here</a> to turn ON the LED.<br>");
+            //client.print("Click <a href=\"/L\">here</a> to turn OFF the LED.<br>");
+            //client.print("Player 1 (X):<br><br>");
+            //client.print("| _ | _ | _ | _ | _ | _ | _ |<br>| _ | _ | _ | _ | _ | _ | _ |<br>| _ | _ | _ | _ | _ | _ | _ |<br>| _ | _ | _ | _ | _ | _ | _ |<br>| _ | _ | _ | _ | _ | _ | _ |<br>| _ | _ | _ | _ | _ | _ | _ |<script>alert('alert')</script>");
+
+
+
+client.print("v5");
+client.print("<!DOCTYPE HTML>");
+client.print("<html>");
+client.print("  <head>");
+client.print("    <title>Connect Four</title>");
+client.print("    <script type='text/javascript'>");
+client.print("      var game_active = false;");
+client.print("      var active_player = 0;");
+client.print("      var gameboard = []; ");
+client.print("      var player_color = []; ");
+client.print("      player_color[1] = 'red'; ");
+client.print("      player_color[2] = 'yellow';");
+client.print("      function beginGame() {");
+client.print("        game_active = true;  ");
+client.print("        for (row=0; row<=5; row++) {");
+client.print("          gameboard[row] = [];");
+client.print("          for (col=0; col<=6; col++) {");
+client.print("            gameboard[row][col] = 0;");
+client.print("          } ");
+client.print("        }   ");
+client.print("        drawBoard();      ");
+client.print("        active_player = 1; ");
+client.print("        setUpTurn(); ");
+client.print("      }");
+client.print("      function drawBoard() {");
+client.print("        checkForWin(); ");
+client.print("        for (col = 0; col<=6; col++) {");
+client.print("          for (row=0; row<=5; row++) {");
+client.print("            document.getElementById('square_'+row+'_'+col).innerHTML =""<span class='piece player""+gameboard[row][col]+""'> </span>"";");
+client.print("          } ");
+client.print("        }");
+client.print("      }");
+client.print("      function checkForWin() {");
+client.print("        for (i=1; i<=2; i++) {");
+client.print("          for (col = 0; col <=3; col++) {");
+client.print("            for (row = 0; row <=5; row++) {");
+client.print("              if (gameboard[row][col] == i) {");
+client.print("                if ((gameboard[row][col+1] == i) && (gameboard[row][col+2] == i) && (gameboard[row][col+3] == i)) {");
+client.print("                  endGame(i);");
+client.print("                  return true; ");
+client.print("                }");
+client.print("              }");
+client.print("            }");
+client.print("          }");
+client.print("        }");
+client.print("        //check top-to-bottom");
+client.print("        for (i=1; i<=2; i++) {");
+client.print("          for (col = 0; col <=6; col++) {");
+client.print("            for (row = 0; row <=2; row++) {");
+client.print("              if (gameboard[row][col] == i) {");
+client.print("                if ((gameboard[row+1][col] == i) && (gameboard[row+2][col] == i) && (gameboard[row+3][col] == i)) {");
+client.print("                  endGame(i); ");
+client.print("                  return true; ");
+client.print("                }");
+client.print("              }");
+client.print("            }");
+client.print("          }");
+client.print("        }");
+client.print("        //check diagonal down");
+client.print("        for (i=1; i<=2; i++) {");
+client.print("          for (col = 0; col <=3; col++) {");
+client.print("            for (row = 0; row <=2; row++) {");
+client.print("              if (gameboard[row][col] == i) {");
+client.print("                if ((gameboard[row+1][col+1] == i) && (gameboard[row+2][col+2] == i) && (gameboard[row+3][col+3] == i)) {");
+client.print("                  endGame(i);");
+client.print("                  return true;");
+client.print("                }");
+client.print("              }");
+client.print("            }");
+client.print("          }");
+client.print("        }");
+client.print("        //check diagonal up");
+client.print("        for (i=1; i<=2; i++) {");
+client.print("          for (col = 0; col <=3; col++) {");
+client.print("            for (row = 3; row <=5; row++) {");
+client.print("              if (gameboard[row][col] == i) {");
+client.print("                if ((gameboard[row-1][col+1] == i) && (gameboard[row-2][col+2] == i) && (gameboard[row-3][col+3] == i)) {");
+client.print("                  endGame(i);");
+client.print("                  return true;");
+client.print("                }");
+client.print("              }");
+client.print("            }");
+client.print("          }");
+client.print("        }");
+client.print("      }");
+client.print("      function endGame(winningPlayer) {");
+client.print("        game_active = false; ");
+client.print("        document.getElementById('game_info').innerHTML = ""Player "" + winningPlayer + "" wins!"";");
+client.print("      }");
+client.print("      function setUpTurn() {");
+client.print("        if (game_active) { ");
+client.print("          document.getElementById('game_info').innerHTML = ""Player "" + active_player + ""'s turn"" + "" <span class='player""+active_player+""'>("" + player_color[active_player] + "")</span>"";");
+client.print("        }");
+client.print("      }     ");
+client.print("      function drop(col) {");
+client.print("          for (row=5; row>=0; row--) { ");
+client.print("            if (gameboard[row][col] == 0) {");
+client.print("              gameboard[row][col] = active_player;");
+client.print("              drawBoard();");
+client.print("              if (active_player == 1) {");
+client.print("                active_player = 2;");
+client.print("              } else {");
+client.print("                active_player = 1;");
+client.print("              }");
+client.print("              setUpTurn(); ");
+client.print("              return true;");
+client.print("            }");
+client.print("          }");
+client.print("      }");
+client.print("    </script>");
+client.print("    <style>");
+client.print("      .click_button {");
+client.print("        height: 42px;");
+client.print("        width: 42px;");
+client.print("        border-radius: 24px;");
+client.print("        background-color: rgba(255");
+client.print("        cursor: pointer;");
+client.print("      }");
+client.print("      .piece {");
+client.print("        height: 90px;");
+client.print("        width: 90px;");
+client.print("        display:block;");
+client.print("        border-radius: 45px;");
+client.print("        margin-left: auto;");
+client.print("        margin-right: auto;");
+client.print("      }");
+client.print("      .player0 {");
+client.print("        background-color: #DDDDDD; ");
+client.print("      }");
+client.print("      .player1 {");
+client.print("        background-color: #FF0000;");
+client.print("      }");
+client.print("      .player2 {");
+client.print("        background-color: #FFFF00;  ");
+client.print("      }");
+client.print("      .board_square {");
+client.print("        border: 1px solid #555555;");
+client.print("        background-color: #0000FF;  ");
+client.print("        height: 100px;");
+client.print("        width: 100px;");
+client.print("      }");
+client.print("    </style>");
+client.print("  </head>");
+client.print("  <body onload='beginGame();'>");
+client.print("    <p style='font-size:50px'>Connect Four</p>");
+client.print("    <p> For game instructions");
+client.print("    <div id='gameboard'>");
+client.print("      <div id='game_info'>");
+client.print("      </div>");
+client.print("      <table id='game_table'>");
+client.print("        <thead>");
+client.print("          <tr>");
+client.print("            <td><button onclick='drop(0);'>Col1</button></td>");
+client.print("            <td><button onclick='drop(1);'>Col2</button></td>");
+client.print("            <td><button onclick='drop(2);'>Col3</button></td>");
+client.print("            <td><button onclick='drop(3);'>Col4</button></td>");
+client.print("            <td><button onclick='drop(4);'>Col5</button></td>");
+client.print("            <td><button onclick='drop(5);'>Col6</button></td>");
+client.print("            <td><button onclick='drop(6);'>Col7</button></td>");
+client.print("          </tr>");
+client.print("        </thead>");
+
+//client.print("        <script>");
+//client.print("        for (var row=0; row<=5; row++) {");
+//client.print("          document.writeln(""<tr>""); ");
+//client.print("          for (var col=0; col<=6; col++) {");
+//client.print("            document.writeln(""<td id='square_"" + row + ""_""+ col +""' class='board_square'>x</td>"");             ");
+//client.print("          }");
+//client.print("          document.writeln(""</tr>"");  ");
+//client.print("        }           ");
+//client.print("        </script>");
+
+client.print("        <tr><td id='square_0_0' class='board_square'>x</td><td id='square_0_1' class='board_square'>x</td><td id='square_0_2' class='board_square'>x</td><td id='square_0_3' class='board_square'>x</td><td id='square_0_4' class='board_square'>x</td><td id='square_0_5' class='board_square'>x</td><td id='square_0_6' class='board_square'>x</td></tr>");
+client.print("        <tr><td id='square_1_0' class='board_square'>x</td><td id='square_1_1' class='board_square'>x</td><td id='square_1_2' class='board_square'>x</td><td id='square_1_3' class='board_square'>x</td><td id='square_1_4' class='board_square'>x</td><td id='square_1_5' class='board_square'>x</td><td id='square_1_6' class='board_square'>x</td></tr>");
+client.print("        <tr><td id='square_2_0' class='board_square'>x</td><td id='square_2_1' class='board_square'>x</td><td id='square_2_2' class='board_square'>x</td><td id='square_2_3' class='board_square'>x</td><td id='square_2_4' class='board_square'>x</td><td id='square_2_5' class='board_square'>x</td><td id='square_2_6' class='board_square'>x</td></tr>");
+client.print("        <tr><td id='square_3_0' class='board_square'>x</td><td id='square_3_1' class='board_square'>x</td><td id='square_3_2' class='board_square'>x</td><td id='square_3_3' class='board_square'>x</td><td id='square_3_4' class='board_square'>x</td><td id='square_3_5' class='board_square'>x</td><td id='square_3_6' class='board_square'>x</td></tr>");
+client.print("        <tr><td id='square_4_0' class='board_square'>x</td><td id='square_4_1' class='board_square'>x</td><td id='square_4_2' class='board_square'>x</td><td id='square_4_3' class='board_square'>x</td><td id='square_4_4' class='board_square'>x</td><td id='square_4_5' class='board_square'>x</td><td id='square_4_6' class='board_square'>x</td></tr>");
+client.print("        <tr><td id='square_5_0' class='board_square'>x</td><td id='square_5_1' class='board_square'>x</td><td id='square_5_2' class='board_square'>x</td><td id='square_5_3' class='board_square'>x</td><td id='square_5_4' class='board_square'>x</td><td id='square_5_5' class='board_square'>x</td><td id='square_5_6' class='board_square'>x</td></tr>");
+
+client.print("      </table>");
+client.print("      <p> </p>");
+client.print("      <div id='game_status'>");
+client.print("      </div>");
+client.print("    <button id='restart_game' onclick='beginGame();'>Restart Game</button>");
+client.print("    </div>");
+client.print("    <p style='font-size:24px'>Rules for Connect Four</p>");
+client.print("    <p style='font-size:16px'>Description</p>");
+client.print("    <p style='font-size:12px'>This game is played on a vertical board with 42 windows distributed in 6 rows and 7 columns. Both players have a set of chips; player 1 uses red chips and player 2 uses yellow chips. The board is empty at the start of the game.</p>");
+client.print("    <p style='font-size:16px'>Objective</p>");
+client.print("    <p style='font-size:12px'>The aim for both players is to make a straight line of four own pieces; the line can be diagonal");
+client.print("    <p style='font-size:16px'>How To Play</p>");
+client.print("    <p style='font-size:12px'>Before starting");
+client.print("    <p style='font-size:12px'>A 'move' is made when a player places a new piece on the board. Pieces slide downwards from upper holes");
+client.print("    <p style='font-size:12px'>The winner is the first player who gets a straight line made with four own pieces and no gaps between them.</p>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("    <br>");
+client.print("  </body>");
+client.print("</html>");
+
+
+
+
+
+            
+
+            // The HTTP response ends with another blank line:
+            client.println();
+            // break out of the while loop:
+            break;
+          } else {    // if you got a newline, then clear currentLine:
+            currentLine = "";
+          }
+        } else if (c != '\r') {  // if you got anything else but a carriage return character,
+          currentLine += c;      // add it to the end of the currentLine
+        }
+
+        // Check to see if the client request was "GET /H" or "GET /L":
+        if (currentLine.endsWith("GET /H")) {
+          digitalWrite(LED_BUILTIN, HIGH);               // GET /H turns the LED on
+        }
+        if (currentLine.endsWith("GET /L")) {
+          digitalWrite(LED_BUILTIN, LOW);                // GET /L turns the LED off
+        }
+      }
+    }
+    // close the connection:
+    client.stop();
+    Serial.println("Client Disconnected.");
+  }
+}
