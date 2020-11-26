@@ -1,0 +1,329 @@
+/*
+  WiFiAccessPoint.ino creates a WiFi access point and provides a web server on it.
+
+  Steps:
+  1. Connect to the access point "yourAp"
+  2. Point your web browser to http://192.168.4.1/H to turn the LED on or http://192.168.4.1/L to turn it off
+     OR
+     Run raw TCP "GET /H" and "GET /L" on PuTTY terminal with 192.168.4.1 as IP address and 80 as port
+
+  Created for arduino-esp32 on 04 July, 2018
+  by Elochukwu Ifediora (fedy0)
+*/
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
+
+
+#define LED_BUILTIN 2   // Set the GPIO pin where you connected your test LED or comment this line out if your dev board has a built-in LED
+
+// Set these to your desired credentials.
+const char *ssid = "connect4 (pwd: connect4)";
+const char *password = "connect4";
+
+WiFiServer server(80);
+
+
+
+
+// Load any HTML content into a rawliteral called index_html
+const char index_html[] PROGMEM = R"rawliteral(
+
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>Connect Four</title>
+    <script type='text/javascript'>
+      var game_active = false;
+      var active_player = 0;
+      var gameboard = []; 
+      var player_color = []; 
+      player_color[1] = 'red'; 
+      player_color[2] = 'yellow';
+      
+      function beginGame() {
+        game_active = true;  
+        for (row=0; row<=5; row++) {
+          gameboard[row] = [];
+          for (col=0; col<=6; col++) {
+            gameboard[row][col] = 0;
+          } 
+        }   
+        
+        drawBoard();      
+        active_player = 1; 
+        setUpTurn(); 
+      }
+      
+      function drawBoard() {
+        checkForWin(); 
+        for (col = 0; col<=6; col++) {
+          for (row=0; row<=5; row++) {
+            document.getElementById('square_'+row+'_'+col).innerHTML ="<span class='piece player"+gameboard[row][col]+"'> </span>";
+          } 
+        }
+      }
+      
+      function checkForWin() {
+        for (i=1; i<=2; i++) {
+          for (col = 0; col <=3; col++) {
+            for (row = 0; row <=5; row++) {
+              if (gameboard[row][col] == i) {
+                if ((gameboard[row][col+1] == i) && (gameboard[row][col+2] == i) && (gameboard[row][col+3] == i)) {
+                  endGame(i);
+                  return true; 
+                }
+              }
+            }
+          }
+        }
+        
+        //check top-to-bottom
+        for (i=1; i<=2; i++) {
+          for (col = 0; col <=6; col++) {
+            for (row = 0; row <=2; row++) {
+              if (gameboard[row][col] == i) {
+                if ((gameboard[row+1][col] == i) && (gameboard[row+2][col] == i) && (gameboard[row+3][col] == i)) {
+                  endGame(i); 
+                  return true; 
+                }
+              }
+            }
+          }
+        }
+        
+        //check diagonal down
+        for (i=1; i<=2; i++) {
+          for (col = 0; col <=3; col++) {
+            for (row = 0; row <=2; row++) {
+              if (gameboard[row][col] == i) {
+                if ((gameboard[row+1][col+1] == i) && (gameboard[row+2][col+2] == i) && (gameboard[row+3][col+3] == i)) {
+                  endGame(i);
+                  return true;
+                }
+              }
+            }
+          }
+        }
+                
+        //check diagonal up
+        for (i=1; i<=2; i++) {
+          for (col = 0; col <=3; col++) {
+            for (row = 3; row <=5; row++) {
+              if (gameboard[row][col] == i) {
+                if ((gameboard[row-1][col+1] == i) && (gameboard[row-2][col+2] == i) && (gameboard[row-3][col+3] == i)) {
+                  endGame(i);
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      function endGame(winningPlayer) {
+        game_active = false; 
+        document.getElementById('game_info').innerHTML = "Player " + winningPlayer + " wins!";
+      }
+      
+      function setUpTurn() {
+        if (game_active) { 
+          document.getElementById('game_info').innerHTML = "Player " + active_player + "'s turn" + " <span class='player"+active_player+"'>(" + player_color[active_player] + ")</span>";
+        }
+      }     
+      
+
+      function drop(col) {
+          for (row=5; row>=0; row--) { 
+            if (gameboard[row][col] == 0) {
+              gameboard[row][col] = active_player;
+              drawBoard();
+              if (active_player == 1) {
+                active_player = 2;
+              } else {
+                active_player = 1;
+              }
+              
+              setUpTurn(); 
+              return true;
+            }
+          }
+      }
+      
+
+    </script>
+    
+    <style>
+      .click_button {
+        height: 42px;
+        width: 42px;
+        border-radius: 24px;
+        background-color: rgba(255,0,0,1);
+        cursor: pointer;
+      }
+      
+      .piece {
+        height: 90px;
+        width: 90px;
+        display:block;
+        border-radius: 45px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      
+
+      .player0 {
+        background-color: #DDDDDD; 
+      }
+      
+      .player1 {
+        background-color: #FF0000;
+      }
+      
+      .player2 {
+        background-color: #FFFF00;  
+      }
+      
+      .board_square {
+        border: 1px solid #555555;
+        background-color: #0000FF;  
+        height: 100px;
+        width: 100px;
+      }
+      
+    </style>
+      
+  </head>
+  <body onload='beginGame();'>
+    <p style='font-size:50px'>Connect Four</p>
+    <p> For game instructions, please scroll down to the section labeled 'Connect Four Rules' below the game board.</p>
+    <div id='gameboard'>
+      <div id='game_info'>
+      </div>
+      <table id='game_table'>
+        <thead>
+          <tr>
+            <td><button onclick='drop(0);'>Col1</button></td>
+            <td><button onclick='drop(1);'>Col2</button></td>
+            <td><button onclick='drop(2);'>Col3</button></td>
+            <td><button onclick='drop(3);'>Col4</button></td>
+            <td><button onclick='drop(4);'>Col5</button></td>
+            <td><button onclick='drop(5);'>Col6</button></td>
+            <td><button onclick='drop(6);'>Col7</button></td>
+          </tr>
+        </thead>
+        <script>
+        for (var row=0; row<=5; row++) {
+          document.writeln("<tr>"); 
+          for (var col=0; col<=6; col++) {
+            document.writeln("<td id='square_" + row + "_"+ col +"' class='board_square'></td>");             
+          }
+          document.writeln("</tr>");  
+        }           
+                    
+        </script>
+      </table>
+      <p> </p>
+      <div id='game_status'>
+      </div>
+    <button id='restart_game' onclick='beginGame();'>Restart Game</button>
+    </div>
+
+    <p style='font-size:24px'>Rules for Connect Four</p>
+    <p style='font-size:16px'>Description</p>
+    <p style='font-size:12px'>This game is played on a vertical board with 42 windows distributed in 6 rows and 7 columns. Both players have a set of chips; player 1 uses red chips and player 2 uses yellow chips. The board is empty at the start of the game.</p>
+    <p style='font-size:16px'>Objective</p>
+    <p style='font-size:12px'>The aim for both players is to make a straight line of four own pieces; the line can be diagonal, horizontal, or vertical.</p>
+    <p style='font-size:16px'>How To Play</p>
+    <p style='font-size:12px'>Before starting, players decide randomly which of them will be the beginner; moves are made alternatively, one by turn.</p>
+    <p style='font-size:12px'>A 'move' is made when a player places a new piece on the board. Pieces slide downwards from upper holes, falling down to the last row or piling up on the last piece introduced in the same column. So, in every turn the introduced piece may be placed at most on seven different squares.</p>
+    <p style='font-size:12px'>The winner is the first player who gets a straight line made with four own pieces and no gaps between them.</p>
+
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+  </body>
+</html>
+
+)rawliteral";
+
+
+
+
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("Configuring access point...");
+
+  // You can remove the password parameter if you want the AP to be open.
+  //WiFi.softAP(ssid, password);
+  WiFi.softAP(ssid);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.begin();
+
+  Serial.println("Server started");
+}
+
+void loop() {
+  WiFiClient client = server.available();   // listen for incoming clients
+
+  if (client) {                             // if you get a client,
+    Serial.println("New Client.");           // print a message out the serial port
+    String currentLine = "";                // make a String to hold incoming data from the client
+    while (client.connected()) {            // loop while the client's connected
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out the serial monitor
+        if (c == '\n') {                    // if the byte is a newline character
+
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+
+
+
+            // the content of the HTTP response follows the header:
+            client.print(index_html);
+
+            
+
+            // The HTTP response ends with another blank line:
+            client.println();
+            // break out of the while loop:
+            break;
+          } else {    // if you got a newline, then clear currentLine:
+            currentLine = "";
+          }
+        } else if (c != '\r') {  // if you got anything else but a carriage return character,
+          currentLine += c;      // add it to the end of the currentLine
+        }
+
+        // Check to see if the client request was "GET /H" or "GET /L":
+        if (currentLine.endsWith("GET /H")) {
+          digitalWrite(LED_BUILTIN, HIGH);               // GET /H turns the LED on
+        }
+        if (currentLine.endsWith("GET /L")) {
+          digitalWrite(LED_BUILTIN, LOW);                // GET /L turns the LED off
+        }
+      }
+    }
+    // close the connection:
+    client.stop();
+    Serial.println("Client Disconnected.");
+  }
+}
